@@ -1,79 +1,83 @@
 # チョコTUBE - YouTube視聴サイト
 
-YouTube動画を視聴できるWebアプリケーション
-
 ## プロジェクト概要
 
-チョコTUBEは、複数のAPIソースを統合したYouTube視聴サイトです。Google公式YouTube APIによる検索機能と、複数のオープンソースプロジェクトからの動画視聴方法を組み合わせています。
+チョコTUBEは、Flask/Jinja2ベースのYouTube視聴Webアプリケーションです。複数のAPIソースを統合し、動画検索、視聴、チャンネル情報表示機能を提供します。
 
-## アーキテクチャ
+## 技術スタック
 
-### バックエンド
-- **Flask** - Pythonウェブフレームワーク
-- **Gunicorn** - 本番環境用WSGIサーバー
+- **バックエンド**: Flask (Python)
+- **テンプレートエンジン**: Jinja2
+- **API**: Invidious API, YouTube Data API v3, EDU Video API
+- **フロントエンド**: HTML, CSS, JavaScript
+- **動画再生**: HLS.js, YouTube埋め込み
 
-### API統合
-- **YouTube Data API v3** - 公式検索機能（要APIキー）
-- **Invidious API** - フォールバック検索・トレンド取得
-- **EDU Video API** - 動画情報取得
-- **YTDL Stream API** - ストリーミングURL取得
-- **M3U8 API** - HLSストリーミング対応
+## 主な機能
 
-### フロントエンド
-- **Jinja2テンプレート** - HTMLレンダリング
-- **HLS.js** - HLSビデオ再生対応
-- **カスタムCSS** - チョコレートテーマのダークモードUI
+### 1. 動画検索・表示
+- サムネイル、タイトル、チャンネル名、再生回数、投稿日時を表示
+- 検索候補のオートコンプリート
+- ページネーション対応
+
+### 2. 複数の再生モード
+- ストリーム再生 (`/watch`)
+- 高画質再生 (`/w`)
+- 埋め込み再生 - nocookie (`/ume`)
+- Education再生 (`/edu`)
+
+### 3. チャンネル情報
+- チャンネルバナー、アイコン表示
+- チャンネル登録者数
+- 最新の動画一覧
+- チャンネル説明
+
+### 4. ライト/ダークモード
+- ワンクリックでテーマ切り替え
+- Cookie保存でセッション間で設定を維持
+
+### 5. プレイヤー機能
+- 画質選択セレクター
+- ループ再生
+- 自動次動画再生
+- キーボードショートカット (Space/K で再生/一時停止)
 
 ## ファイル構造
 
 ```
 ├── app.py              # メインFlaskアプリケーション
 ├── templates/
-│   ├── base.html       # ベーステンプレート
-│   ├── index.html      # ホームページ（トレンド）
+│   ├── base.html       # ベーステンプレート（テーマ切り替え含む）
+│   ├── index.html      # ホームページ（トレンド動画）
 │   ├── search.html     # 検索結果ページ
-│   └── watch.html      # 動画再生ページ
+│   ├── watch.html      # 動画再生ページ
+│   └── channel.html    # チャンネルページ
 ├── static/
-│   ├── style.css       # スタイルシート
+│   ├── style.css       # スタイルシート（ライト/ダーク対応）
 │   └── script.js       # フロントエンドスクリプト
 ├── requirements.txt    # Python依存関係
-├── Procfile            # Heroku/Render用
-└── render.yaml         # Render設定
+└── replit.md           # このファイル
 ```
 
 ## 環境変数
 
 | 変数名 | 説明 | 必須 |
-|--------|------|------|
-| `YOUTUBE_API_KEY` | Google YouTube Data API v3キー | 任意（なしでもInvidious APIで検索可能） |
+| --- | --- | --- |
+| `YOUTUBE_API_KEY` | Google YouTube Data API v3キー | 任意（なくてもInvidious APIで動作） |
 
-## 機能
+## 開発メモ
 
-- 急上昇動画の表示
-- 動画検索（YouTube API/Invidious API）
-- 動画再生（複数ソース対応）
-- 関連動画表示
-- コメント表示
+### 2025-11-29
+- choco-tube-bateリポジトリをベースに作成
+- new-yu-yuリポジトリから以下の機能を統合:
+  - 埋め込み機能 (nocookie, education)
+  - 高画質再生機能 (adaptiveFormats対応)
+  - チャンネル情報取得 (バナー、登録者数等)
+  - 検索結果にサムネイル・タイトル・チャンネル情報を表示
+- ライト/ダークモード切り替え機能を実装
+- 再生モード選択機能を追加
 
-## Renderへのデプロイ
+### API情報
 
-1. GitHubにプッシュ
-2. Renderで新しいWeb Serviceを作成
-3. ビルドコマンド: `pip install -r requirements.txt`
-4. スタートコマンド: `gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120 app:app`
-5. 環境変数に`YOUTUBE_API_KEY`を設定（任意）
-
-## ローカル開発
-
-```bash
-pip install -r requirements.txt
-python app.py
-```
-
-## 更新履歴
-
-- 2025-11-29: 初期バージョン作成
-  - Flask/Jinja2ベースのアプリケーション
-  - 複数APIソースの統合
-  - チョコレートテーマUI
-  - Render対応
+- Invidious API: 複数インスタンスからフォールバック
+- 高画質ストリーム: webmコンテナ、1080p/720p優先
+- 音声ストリーム: m4a AUDIO_QUALITY_MEDIUM
