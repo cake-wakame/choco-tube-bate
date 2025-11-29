@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block title %}{{ video.title if video else '動画' }} - チョコTUBE{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/hls.js@1.4.12/dist/hls.min.js" rel="preload" as="script">
+{% endblock %}
+
+{% block content %}
+<div class="watch-container">
+    <div class="watch-main">
+        <div class="player-container">
+            <div id="player-wrapper" class="player-wrapper">
+                {% if streams.primary %}
+                <video id="video-player" class="video-player" controls autoplay playsinline>
+                    <source src="{{ streams.primary }}" type="video/mp4">
+                </video>
+                {% elif streams.m3u8 %}
+                <video id="video-player" class="video-player" controls autoplay playsinline></video>
+                {% else %}
+                <iframe id="embed-player" class="embed-player" 
+                        src="{{ streams.embed }}" 
+                        frameborder="0" 
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                        allowfullscreen></iframe>
+                {% endif %}
+            </div>
+            
+            <div class="player-controls">
+                <button class="player-source-btn active" data-source="primary" title="プライマリソース">
+                    <span>🎬 ソース1</span>
+                </button>
+                <button class="player-source-btn" data-source="m3u8" title="HLSソース">
+                    <span>📺 ソース2</span>
+                </button>
+                <button class="player-source-btn" data-source="embed" title="埋め込み">
+                    <span>🔗 埋め込み</span>
+                </button>
+            </div>
+        </div>
+        
+        {% if video %}
+        <div class="video-details">
+            <h1 class="video-title">{{ video.title }}</h1>
+            <div class="video-stats">
+                <span class="views">{{ video.views }} 回視聴</span>
+                <span class="separator">•</span>
+                <span class="published">{{ video.published }}</span>
+                <span class="likes">👍 {{ video.likes }}</span>
+            </div>
+            
+            <div class="channel-info">
+                {% if video.author_thumbnail %}
+                <img src="{{ video.author_thumbnail }}" alt="{{ video.author }}" class="channel-avatar">
+                {% endif %}
+                <div class="channel-details">
+                    <h3 class="channel-name">{{ video.author }}</h3>
+                    {% if video.subscribers %}
+                    <span class="subscribers">{{ video.subscribers }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="description">
+                <div class="description-content" id="description">
+                    {{ video.description|safe }}
+                </div>
+                <button class="description-toggle" id="desc-toggle">もっと見る</button>
+            </div>
+        </div>
+        
+        <div class="comments-section">
+            <h3 class="comments-title">コメント ({{ comments|length }}件)</h3>
+            <div class="comments-list">
+                {% for comment in comments %}
+                <div class="comment">
+                    <img src="{{ comment.author_thumbnail }}" alt="{{ comment.author }}" class="comment-avatar">
+                    <div class="comment-content">
+                        <div class="comment-header">
+                            <span class="comment-author">{{ comment.author }}</span>
+                            <span class="comment-date">{{ comment.published }}</span>
+                        </div>
+                        <div class="comment-text">{{ comment.content|safe }}</div>
+                        <div class="comment-actions">
+                            <span class="comment-likes">👍 {{ comment.likes }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <p class="no-comments">コメントはありません</p>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <aside class="watch-sidebar">
+        <h3 class="sidebar-title">関連動画</h3>
+        <div class="related-videos">
+            {% if video and video.related %}
+            {% for related in video.related %}
+            <a href="/watch/{{ related.id }}" class="related-card">
+                <div class="related-thumbnail-container">
+                    <img src="{{ related.thumbnail }}" alt="{{ related.title }}" class="related-thumbnail" loading="lazy">
+                </div>
+                <div class="related-info">
+                    <h4 class="related-title">{{ related.title }}</h4>
+                    <p class="related-author">{{ related.author }}</p>
+                    <p class="related-views">{{ related.views }}</p>
+                </div>
+            </a>
+            {% endfor %}
+            {% endif %}
+        </div>
+    </aside>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.4.12/dist/hls.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const videoId = '{{ video_id }}';
+    const streams = {
+        primary: '{{ streams.primary|default("", true) }}',
+        fallback: '{{ streams.fallback|default("", true) }}',
+        m3u8: '{{ streams.m3u8|default("", true) }}',
+        embed: '{{ streams.embed }}'
+    };
+    
+    const playerWrapper = document.getElementById('player-wrapper');
+    const sourceButtons = document.querySelectorAll('.player-source-btn');
+    
+    function loadSource(source) {
+        let html = '';
+        
+        if (source === 'primary' && streams.primary) {
+            html = `<video id="video-player" class="video-player" controls autoplay playsinline>
+                        <source src="${streams.primary}" type="video/mp4">
+                    </video>`;
+        } else if (source === 'm3u8' && streams.m3u8) {
+            html = `<video id="video-player" class="video-player" controls autoplay playsinline></video>`;
+            playerWrapper.innerHTML = html;
+            
+            const video = document.getElementById('video-player');
+            if (Hls.isSupported()) {
+                const hls = new Hls();
+                hls.loadSource(streams.m3u8);
+                hls.attachMedia(video);
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = streams.m3u8;
+            }
+            return;
+        } else {
+            html = `<iframe id="embed-player" class="embed-player" 
+                        src="${streams.embed}" 
+                        frameborder="0" 
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                        allowfullscreen></iframe>`;
+        }
+        
+        playerWrapper.innerHTML = html;
+    }
+    
+    sourceButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            sourceButtons.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            loadSource(this.dataset.source);
+        });
+    });
+    
+    const descToggle = document.getElementById('desc-toggle');
+    const description = document.getElementById('description');
+    if (descToggle && description) {
+        descToggle.addEventListener('click', function() {
+            description.classList.toggle('expanded');
+            this.textContent = description.classList.contains('expanded') ? '閉じる' : 'もっと見る';
+        });
+    }
+    
+    if (streams.m3u8 && !streams.primary) {
+        const video = document.getElementById('video-player');
+        if (video && Hls.isSupported()) {
+            const hls = new Hls();
+            hls.loadSource(streams.m3u8);
+            hls.attachMedia(video);
+        } else if (video && video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = streams.m3u8;
+        }
+    }
+});
+</script>
+{% endblock %}
