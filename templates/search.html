@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}{{ query }} - チョコTUBE検索{% endblock %}
+
+{% block content %}
+<div class="search-container">
+    {% if query %}
+    <h2 class="search-results-title">「{{ query }}」の検索結果</h2>
+    {% endif %}
+    
+    <div class="search-results">
+        {% for video in videos %}
+        <a href="/watch/{{ video.id }}" class="search-result-card">
+            <div class="result-thumbnail-container">
+                <img src="{{ video.thumbnail }}" alt="{{ video.title }}" class="result-thumbnail" loading="lazy">
+            </div>
+            <div class="result-info">
+                <h3 class="result-title">{{ video.title }}</h3>
+                <p class="result-meta">
+                    <span>{{ video.author }}</span>
+                    {% if video.views %}
+                    <span class="separator">•</span>
+                    <span>{{ video.views }}</span>
+                    {% endif %}
+                    {% if video.published %}
+                    <span class="separator">•</span>
+                    <span>{{ video.published }}</span>
+                    {% endif %}
+                </p>
+                {% if video.description %}
+                <p class="result-description">{{ video.description[:150] }}...</p>
+                {% endif %}
+            </div>
+        </a>
+        {% else %}
+        <div class="no-results">
+            {% if query %}
+            <p>「{{ query }}」に一致する動画が見つかりませんでした。</p>
+            {% else %}
+            <p>検索キーワードを入力してください。</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
