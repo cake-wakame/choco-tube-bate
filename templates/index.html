@@ -11,7 +11,7 @@
         </h2>
         <div class="video-grid">
             {% for video in videos %}
-            <a href="/watch/{{ video.id }}" class="video-card">
+            <a href="/watch?v={{ video.id }}" class="video-card">
                 <div class="thumbnail-container">
                     <img src="{{ video.thumbnail }}" alt="{{ video.title }}" class="thumbnail" loading="lazy">
                 </div>
