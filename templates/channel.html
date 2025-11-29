@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}{{ channel.channelName if channel else 'チャンネル' }} - チョコTUBE{% endblock %}
+
+{% block content %}
+<div class="channel-container">
+    {% if channel %}
+    <div class="channel-header">
+        {% if channel.authorBanner %}
+        <div class="channel-banner" style="background-image: url('{{ channel.authorBanner }}');"></div>
+        {% endif %}
+        <div class="channel-profile">
+            {% if channel.channelIcon %}
+            <img src="{{ channel.channelIcon }}" alt="{{ channel.channelName }}" class="channel-icon">
+            {% endif %}
+            <div class="channel-info-main">
+                <h1 class="channel-name-large">{{ channel.channelName }}</h1>
+                <p class="channel-subscribers">{{ channel.subscribers }} 人のチャンネル登録者</p>
+            </div>
+        </div>
+    </div>
+
+    {% if channel.channelProfile %}
+    <div class="channel-description-box">
+        <h3>チャンネル説明</h3>
+        <div class="channel-description">{{ channel.channelProfile|safe }}</div>
+    </div>
+    {% endif %}
+
+    {% if channel.tags %}
+    <div class="channel-tags">
+        {% for tag in channel.tags %}
+        <a href="/search?q={{ tag }}" class="tag">{{ tag }}</a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <section class="channel-videos-section">
+        <h2 class="section-title">最新の動画</h2>
+        <div class="video-grid">
+            {% for video in videos %}
+            <a href="{{ '/watch' if vc == '1' else ('/w' if vc == '2' else ('/ume' if vc == '3' else '/edu')) }}?v={{ video.id }}" class="video-card">
+                <div class="thumbnail-container">
+                    <img src="{% if proxy == 'True' %}/thumbnail?v={{ video.id }}{% else %}https://i.ytimg.com/vi/{{ video.id }}/hqdefault.jpg{% endif %}" alt="{{ video.title }}" class="thumbnail" loading="lazy">
+                    {% if video.length %}
+                    <span class="video-duration">{{ video.length }}</span>
+                    {% endif %}
+                </div>
+                <div class="video-info">
+                    <h3 class="video-title">{{ video.title }}</h3>
+                    <p class="video-meta">
+                        <span>{{ video.views }}</span>
+                        {% if video.published %}
+                        <span class="separator">•</span>
+                        <span>{{ video.published }}</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </a>
+            {% else %}
+            <div class="no-videos">
+                <p>動画が見つかりませんでした。</p>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% else %}
+    <div class="channel-not-found">
+        <h2>チャンネルが見つかりませんでした</h2>
+        <p>このチャンネルは存在しないか、読み込みに失敗しました。</p>
+        <a href="/" class="back-home-btn">ホームに戻る</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
