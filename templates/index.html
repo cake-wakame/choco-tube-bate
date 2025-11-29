@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}チョコTUBE - ホーム{% endblock %}
+
+{% block content %}
+<div class="home-container">
+    <section class="trending-section">
+        <h2 class="section-title">
+            <span class="section-icon">🔥</span>
+            急上昇
+        </h2>
+        <div class="video-grid">
+            {% for video in videos %}
+            <a href="/watch/{{ video.id }}" class="video-card">
+                <div class="thumbnail-container">
+                    <img src="{{ video.thumbnail }}" alt="{{ video.title }}" class="thumbnail" loading="lazy">
+                </div>
+                <div class="video-info">
+                    <h3 class="video-title">{{ video.title }}</h3>
+                    <p class="video-author">{{ video.author }}</p>
+                    <p class="video-meta">
+                        <span>{{ video.views }}</span>
+                        {% if video.published %}
+                        <span class="separator">•</span>
+                        <span>{{ video.published }}</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </a>
+            {% else %}
+            <div class="no-videos">
+                <p>動画を読み込み中...</p>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+</div>
+{% endblock %}
