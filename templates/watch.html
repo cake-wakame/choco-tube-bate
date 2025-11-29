@@ -11,34 +11,74 @@
     <div class="watch-main">
         <div class="player-container">
             <div id="player-wrapper" class="player-wrapper">
-                {% if streams.primary %}
-                <video id="video-player" class="video-player" controls autoplay playsinline>
+                {% if mode == 'embed' %}
+                <iframe id="embed-player" class="embed-player"
+                        src="{{ streams.embed }}"
+                        frameborder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowfullscreen></iframe>
+                {% elif mode == 'education' %}
+                <iframe id="embed-player" class="embed-player"
+                        src="{{ streams.education }}"
+                        frameborder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowfullscreen></iframe>
+                {% elif mode == 'high' and video and video.highstreamUrl %}
+                <video id="video-player" class="video-player" controls autoplay playsinline
+                       poster="https://i.ytimg.com/vi/{{ video_id }}/maxresdefault.jpg">
+                    <source src="{{ video.highstreamUrl }}" type="video/webm">
+                </video>
+                {% elif video and video.videoUrls %}
+                <video id="video-player" class="video-player" controls autoplay playsinline
+                       poster="https://i.ytimg.com/vi/{{ video_id }}/maxresdefault.jpg">
+                    {% for url in video.videoUrls %}
+                    <source src="{{ url }}" type="video/mp4">
+                    {% endfor %}
+                </video>
+                {% elif streams.primary %}
+                <video id="video-player" class="video-player" controls autoplay playsinline
+                       poster="https://i.ytimg.com/vi/{{ video_id }}/maxresdefault.jpg">
                     <source src="{{ streams.primary }}" type="video/mp4">
                 </video>
                 {% elif streams.m3u8 %}
-                <video id="video-player" class="video-player" controls autoplay playsinline></video>
+                <video id="video-player" class="video-player" controls autoplay playsinline
+                       poster="https://i.ytimg.com/vi/{{ video_id }}/maxresdefault.jpg"></video>
                 {% else %}
-                <iframe id="embed-player" class="embed-player" 
-                        src="{{ streams.embed }}" 
-                        frameborder="0" 
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                <iframe id="embed-player" class="embed-player"
+                        src="{{ streams.embed }}"
+                        frameborder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowfullscreen></iframe>
                 {% endif %}
             </div>
-            
+
             <div class="player-controls">
-                <button class="player-source-btn active" data-source="primary" title="プライマリソース">
-                    <span>🎬 ソース1</span>
-                </button>
-                <button class="player-source-btn" data-source="m3u8" title="HLSソース">
-                    <span>📺 ソース2</span>
-                </button>
-                <button class="player-source-btn" data-source="embed" title="埋め込み">
+                <a href="/watch?v={{ video_id }}" class="player-source-btn {% if mode == 'stream' %}active{% endif %}">
+                    <span>🎬 ストリーム</span>
+                </a>
+                <a href="/w?v={{ video_id }}" class="player-source-btn {% if mode == 'high' %}active{% endif %}">
+                    <span>📺 高画質</span>
+                </a>
+                <a href="/ume?v={{ video_id }}" class="player-source-btn {% if mode == 'embed' %}active{% endif %}">
                     <span>🔗 埋め込み</span>
-                </button>
+                </a>
+                <a href="/edu?v={{ video_id }}" class="player-source-btn {% if mode == 'education' %}active{% endif %}">
+                    <span>🎓 Education</span>
+                </a>
             </div>
+
+            {% if video and video.streamUrls %}
+            <div class="resolution-selector">
+                <label for="resolutionSelect">画質選択:</label>
+                <select id="resolutionSelect">
+                    {% for stream in video.streamUrls %}
+                    <option value="{{ stream.url }}">{{ stream.resolution }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
         </div>
-        
+
         {% if video %}
         <div class="video-details">
             <h1 class="video-title">{{ video.title }}</h1>
@@ -48,36 +88,55 @@
                 <span class="published">{{ video.published }}</span>
                 <span class="likes">👍 {{ video.likes }}</span>
             </div>
-            
+
             <div class="channel-info">
-                {% if video.author_thumbnail %}
-                <img src="{{ video.author_thumbnail }}" alt="{{ video.author }}" class="channel-avatar">
+                {% if video.authorThumbnail %}
+                <img src="{{ video.authorThumbnail }}" alt="{{ video.author }}" class="channel-avatar">
                 {% endif %}
                 <div class="channel-details">
-                    <h3 class="channel-name">{{ video.author }}</h3>
+                    <a href="/channel/{{ video.authorId }}" class="channel-name">{{ video.author }}</a>
                     {% if video.subscribers %}
-                    <span class="subscribers">{{ video.subscribers }}</span>
+                    <span class="subscribers">{{ video.subscribers }} 人</span>
                     {% endif %}
                 </div>
             </div>
-            
+
             <div class="description">
                 <div class="description-content" id="description">
                     {{ video.description|safe }}
                 </div>
                 <button class="description-toggle" id="desc-toggle">もっと見る</button>
             </div>
+
+            <div class="player-options">
+                <label class="option-label">
+                    <input type="checkbox" id="loopToggle">
+                    ループ再生
+                </label>
+                <label class="option-label">
+                    <input type="checkbox" id="autoNextToggle">
+                    自動で次の動画へ
+                </label>
+            </div>
+
+            {% if video.videoUrls and video.videoUrls[0] %}
+            <div class="download-section">
+                <a href="{{ video.videoUrls[0] }}" download="{{ video.title }}" class="download-btn">
+                    ⬇️ ダウンロード
+                </a>
+            </div>
+            {% endif %}
         </div>
-        
+
         <div class="comments-section">
-            <h3 class="comments-title">コメント ({{ comments|length }}件)</h3>
-            <div class="comments-list">
+            <h3 class="comments-title">コメント</h3>
+            <div class="comments-list" id="comments">
                 {% for comment in comments %}
                 <div class="comment">
-                    <img src="{{ comment.author_thumbnail }}" alt="{{ comment.author }}" class="comment-avatar">
+                    <img src="{{ comment.authorThumbnail }}" alt="{{ comment.author }}" class="comment-avatar">
                     <div class="comment-content">
                         <div class="comment-header">
-                            <span class="comment-author">{{ comment.author }}</span>
+                            <a href="/channel/{{ comment.authorId }}" class="comment-author">{{ comment.author }}</a>
                             <span class="comment-date">{{ comment.published }}</span>
                         </div>
                         <div class="comment-text">{{ comment.content|safe }}</div>
@@ -93,19 +152,22 @@
         </div>
         {% endif %}
     </div>
-    
+
     <aside class="watch-sidebar">
         <h3 class="sidebar-title">関連動画</h3>
         <div class="related-videos">
             {% if video and video.related %}
             {% for related in video.related %}
-            <a href="/watch/{{ related.id }}" class="related-card">
+            <a href="/watch?v={{ related.id }}" class="related-card">
                 <div class="related-thumbnail-container">
                     <img src="{{ related.thumbnail }}" alt="{{ related.title }}" class="related-thumbnail" loading="lazy">
+                    {% if related.length %}
+                    <span class="video-duration">{{ related.length }}</span>
+                    {% endif %}
                 </div>
                 <div class="related-info">
                     <h4 class="related-title">{{ related.title }}</h4>
-                    <p class="related-author">{{ related.author }}</p>
+                    <a href="/channel/{{ related.authorId }}" class="related-author">{{ related.author }}</a>
                     <p class="related-views">{{ related.views }}</p>
                 </div>
             </a>
@@ -121,54 +183,19 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const videoId = '{{ video_id }}';
-    const streams = {
-        primary: '{{ streams.primary|default("", true) }}',
-        fallback: '{{ streams.fallback|default("", true) }}',
-        m3u8: '{{ streams.m3u8|default("", true) }}',
-        embed: '{{ streams.embed }}'
-    };
+    const m3u8Url = '{{ streams.m3u8|default("", true) }}';
     
-    const playerWrapper = document.getElementById('player-wrapper');
-    const sourceButtons = document.querySelectorAll('.player-source-btn');
+    const video = document.getElementById('video-player');
     
-    function loadSource(source) {
-        let html = '';
-        
-        if (source === 'primary' && streams.primary) {
-            html = `<video id="video-player" class="video-player" controls autoplay playsinline>
-                        <source src="${streams.primary}" type="video/mp4">
-                    </video>`;
-        } else if (source === 'm3u8' && streams.m3u8) {
-            html = `<video id="video-player" class="video-player" controls autoplay playsinline></video>`;
-            playerWrapper.innerHTML = html;
-            
-            const video = document.getElementById('video-player');
-            if (Hls.isSupported()) {
-                const hls = new Hls();
-                hls.loadSource(streams.m3u8);
-                hls.attachMedia(video);
-            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = streams.m3u8;
-            }
-            return;
-        } else {
-            html = `<iframe id="embed-player" class="embed-player" 
-                        src="${streams.embed}" 
-                        frameborder="0" 
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                        allowfullscreen></iframe>`;
+    if (video && m3u8Url && !video.querySelector('source')) {
+        if (Hls.isSupported()) {
+            const hls = new Hls();
+            hls.loadSource(m3u8Url);
+            hls.attachMedia(video);
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = m3u8Url;
         }
-        
-        playerWrapper.innerHTML = html;
     }
-    
-    sourceButtons.forEach(btn => {
-        btn.addEventListener('click', function() {
-            sourceButtons.forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
-            loadSource(this.dataset.source);
-        });
-    });
     
     const descToggle = document.getElementById('desc-toggle');
     const description = document.getElementById('description');
@@ -179,16 +206,76 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    if (streams.m3u8 && !streams.primary) {
-        const video = document.getElementById('video-player');
-        if (video && Hls.isSupported()) {
-            const hls = new Hls();
-            hls.loadSource(streams.m3u8);
-            hls.attachMedia(video);
-        } else if (video && video.canPlayType('application/vnd.apple.mpegurl')) {
-            video.src = streams.m3u8;
-        }
+    const loopToggle = document.getElementById('loopToggle');
+    const autoNextToggle = document.getElementById('autoNextToggle');
+    
+    function getCookie(name) {
+        const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+        return v ? decodeURIComponent(v.pop()) : null;
     }
+    
+    function setCookie(name, value, days) {
+        const d = new Date();
+        d.setTime(d.getTime() + (days || 30) * 24 * 60 * 60 * 1000);
+        document.cookie = name + '=' + encodeURIComponent(value) + ';expires=' + d.toUTCString() + ';path=/';
+    }
+    
+    if (loopToggle && video) {
+        loopToggle.checked = getCookie('loop') === 'true';
+        video.loop = loopToggle.checked;
+        
+        loopToggle.addEventListener('change', function() {
+            video.loop = this.checked;
+            setCookie('loop', this.checked, 30);
+        });
+    }
+    
+    if (autoNextToggle) {
+        autoNextToggle.checked = getCookie('autonext') === 'true';
+        
+        autoNextToggle.addEventListener('change', function() {
+            setCookie('autonext', this.checked, 30);
+        });
+    }
+    
+    if (video) {
+        video.addEventListener('ended', function() {
+            if (getCookie('autonext') === 'true') {
+                {% if video and video.related and video.related|length > 0 %}
+                setTimeout(function() {
+                    window.location.href = '/watch?v={{ video.related[0].id }}';
+                }, 3000);
+                {% endif %}
+            }
+        });
+    }
+    
+    const resolutionSelect = document.getElementById('resolutionSelect');
+    if (resolutionSelect && video) {
+        resolutionSelect.addEventListener('change', function() {
+            const currentTime = video.currentTime;
+            const isPaused = video.paused;
+            
+            video.src = this.value;
+            video.currentTime = currentTime;
+            if (!isPaused) {
+                video.play();
+            }
+        });
+    }
+    
+    document.addEventListener('keydown', function(e) {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        
+        if (video && (e.keyCode === 32 || e.keyCode === 75)) {
+            e.preventDefault();
+            if (video.paused) {
+                video.play();
+            } else {
+                video.pause();
+            }
+        }
+    });
 });
 </script>
 {% endblock %}
