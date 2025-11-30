@@ -1172,7 +1172,15 @@ body {
 
 @media (max-width: 768px) {
   .header-nav {
-    display: none;
+    gap: 8px;
+    margin-right: 8px;
+  }
+
+  .nav-link {
+    font-size: 12px;
+    padding: 4px 8px;
+    background: var(--bg-card);
+    border-radius: 4px;
   }
 
   .help-cards {
