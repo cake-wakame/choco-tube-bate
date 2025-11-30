@@ -44,11 +44,17 @@
                 <video id="video-player" class="video-player" controls autoplay playsinline
                        poster="https://i.ytimg.com/vi/{{ video_id }}/maxresdefault.jpg"></video>
                 {% else %}
-                <iframe id="embed-player" class="embed-player"
-                        src="{{ streams.embed }}"
-                        frameborder="0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowfullscreen></iframe>
+                <div class="player-error">
+                    <div class="error-content">
+                        <span class="error-icon">⚠️</span>
+                        <h3>再生できませんでした</h3>
+                        <p>このモードでは動画を取得できませんでした。<br>別の再生モードをお試しください。</p>
+                        <div class="error-actions">
+                            <a href="/ume?v={{ video_id }}" class="error-btn primary">🔗 埋め込みモードで再生</a>
+                            <a href="/edu?v={{ video_id }}" class="error-btn">🎓 Educationモードで再生</a>
+                        </div>
+                    </div>
+                </div>
                 {% endif %}
             </div>
 
