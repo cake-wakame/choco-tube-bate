@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}チョコTUBE - ホーム{% endblock %}
+{% block title %}チョコTube - ホーム{% endblock %}
 
 {% block content %}
 <div class="home-container">
@@ -13,7 +13,7 @@
             {% for video in videos %}
             <a href="/watch?v={{ video.id }}" class="video-card">
                 <div class="thumbnail-container">
-                    <img src="{{ video.thumbnail }}" alt="{{ video.title }}" class="thumbnail" loading="lazy">
+                    <img src="/thumbnail?v={{ video.id }}" alt="{{ video.title }}" class="thumbnail" loading="lazy">
                 </div>
                 <div class="video-info">
                     <h3 class="video-title">{{ video.title }}</h3>
