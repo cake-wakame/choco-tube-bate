@@ -57,10 +57,10 @@ def get_random_headers():
 def get_edu_params():
     cache_duration = 300
     current_time = time.time()
-    
+
     if _edu_params_cache['params'] and (current_time - _edu_params_cache['timestamp']) < cache_duration:
         return _edu_params_cache['params']
-    
+
     try:
         res = session.get(EDU_CONFIG_URL, headers=get_random_headers(), timeout=3)
         res.raise_for_status()
@@ -377,10 +377,10 @@ def get_comments(video_id):
 def get_trending():
     cache_duration = 300
     current_time = time.time()
-    
+
     if _trending_cache['data'] and (current_time - _trending_cache['timestamp']) < cache_duration:
         return _trending_cache['data']
-    
+
     path = "/popular"
     data = request_invidious_api(path, timeout=(2, 4))
 
