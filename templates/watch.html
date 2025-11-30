@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ video.title if video else '動画' }} - チョコTUBE{% endblock %}
+{% block title %}{{ video.title if video else '動画' }} - チョコTube{% endblock %}
 
 {% block extra_css %}
 <link href="https://cdn.jsdelivr.net/npm/hls.js@1.4.12/dist/hls.min.js" rel="preload" as="script">
@@ -160,7 +160,7 @@
             {% for related in video.related %}
             <a href="/watch?v={{ related.id }}" class="related-card">
                 <div class="related-thumbnail-container">
-                    <img src="{{ related.thumbnail }}" alt="{{ related.title }}" class="related-thumbnail" loading="lazy">
+                    <img src="/thumbnail?v={{ related.id }}" alt="{{ related.title }}" class="related-thumbnail" loading="lazy">
                     {% if related.length %}
                     <span class="video-duration">{{ related.length }}</span>
                     {% endif %}
@@ -184,9 +184,9 @@
 document.addEventListener('DOMContentLoaded', function() {
     const videoId = '{{ video_id }}';
     const m3u8Url = '{{ streams.m3u8|default("", true) }}';
-    
+
     const video = document.getElementById('video-player');
-    
+
     if (video && m3u8Url && !video.querySelector('source')) {
         if (Hls.isSupported()) {
             const hls = new Hls();
@@ -196,7 +196,7 @@ document.addEventListener('DOMContentLoaded', function() {
             video.src = m3u8Url;
         }
     }
-    
+
     const descToggle = document.getElementById('desc-toggle');
     const description = document.getElementById('description');
     if (descToggle && description) {
@@ -205,39 +205,39 @@ document.addEventListener('DOMContentLoaded', function() {
             this.textContent = description.classList.contains('expanded') ? '閉じる' : 'もっと見る';
         });
     }
-    
+
     const loopToggle = document.getElementById('loopToggle');
     const autoNextToggle = document.getElementById('autoNextToggle');
-    
+
     function getCookie(name) {
         const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
         return v ? decodeURIComponent(v.pop()) : null;
     }
-    
+
     function setCookie(name, value, days) {
         const d = new Date();
         d.setTime(d.getTime() + (days || 30) * 24 * 60 * 60 * 1000);
         document.cookie = name + '=' + encodeURIComponent(value) + ';expires=' + d.toUTCString() + ';path=/';
     }
-    
+
     if (loopToggle && video) {
         loopToggle.checked = getCookie('loop') === 'true';
         video.loop = loopToggle.checked;
-        
+
         loopToggle.addEventListener('change', function() {
             video.loop = this.checked;
             setCookie('loop', this.checked, 30);
         });
     }
-    
+
     if (autoNextToggle) {
         autoNextToggle.checked = getCookie('autonext') === 'true';
-        
+
         autoNextToggle.addEventListener('change', function() {
             setCookie('autonext', this.checked, 30);
         });
     }
-    
+
     if (video) {
         video.addEventListener('ended', function() {
             if (getCookie('autonext') === 'true') {
@@ -249,13 +249,13 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-    
+
     const resolutionSelect = document.getElementById('resolutionSelect');
     if (resolutionSelect && video) {
         resolutionSelect.addEventListener('change', function() {
             const currentTime = video.currentTime;
             const isPaused = video.paused;
-            
+
             video.src = this.value;
             video.currentTime = currentTime;
             if (!isPaused) {
@@ -263,10 +263,10 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-    
+
     document.addEventListener('keydown', function(e) {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-        
+
         if (video && (e.keyCode === 32 || e.keyCode === 75)) {
             e.preventDefault();
             if (video.paused) {
