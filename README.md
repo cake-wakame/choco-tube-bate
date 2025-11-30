@@ -68,7 +68,6 @@
 
 ### 2025-11-29
 - choco-tube-bateリポジトリをベースに作成
-- new-yu-yuリポジトリから以下の機能を統合:
   - 埋め込み機能 (nocookie, education)
   - 高画質再生機能 (adaptiveFormats対応)
   - チャンネル情報取得 (バナー、登録者数等)
