@@ -6,3 +6,7 @@ flask
 gunicorn
 python-dotenv
 requests
+flask
+gunicorn
+requests
+urllib3
