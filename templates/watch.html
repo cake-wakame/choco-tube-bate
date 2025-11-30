@@ -184,17 +184,243 @@
 document.addEventListener('DOMContentLoaded', function() {
     const videoId = '{{ video_id }}';
     const m3u8Url = '{{ streams.m3u8|default("", true) }}';
+    const mode = '{{ mode }}';
 
     const video = document.getElementById('video-player');
+    let retryCount = 0;
+    const maxRetries = 3;
+    let errorTimeout = null;
+    let hasPlayedSuccessfully = false;
+    let isRetrying = false;
+    let fallbackShown = false;
+    let hlsInstance = null;
+    let stalledTimeout = null;
+    let initialLoadTimeout = null;
+
+    function showReloadNotification(message) {
+        let notification = document.getElementById('reload-notification');
+        if (!notification) {
+            notification = document.createElement('div');
+            notification.id = 'reload-notification';
+            notification.style.cssText = 'position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: rgba(139, 69, 19, 0.95); color: white; padding: 16px 24px; border-radius: 8px; z-index: 9999; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 12px;';
+            document.body.appendChild(notification);
+        }
+        notification.innerHTML = '<span style="animation: spin 1s linear infinite; display: inline-block;">🔄</span> ' + message;
+        notification.style.display = 'flex';
+        
+        if (!document.querySelector('style[data-reload-animation]')) {
+            const style = document.createElement('style');
+            style.textContent = '@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }';
+            style.setAttribute('data-reload-animation', 'true');
+            document.head.appendChild(style);
+        }
+    }
+
+    function hideReloadNotification() {
+        const notification = document.getElementById('reload-notification');
+        if (notification) {
+            notification.style.display = 'none';
+        }
+    }
+
+    function clearAllTimeouts() {
+        clearTimeout(errorTimeout);
+        clearTimeout(stalledTimeout);
+        clearTimeout(initialLoadTimeout);
+        errorTimeout = null;
+        stalledTimeout = null;
+        initialLoadTimeout = null;
+    }
+
+    function resetRetryState() {
+        retryCount = 0;
+        isRetrying = false;
+        clearAllTimeouts();
+        hideReloadNotification();
+    }
+
+    function destroyHlsInstance() {
+        if (hlsInstance) {
+            hlsInstance.destroy();
+            hlsInstance = null;
+        }
+    }
+
+    function handleVideoError() {
+        if (hasPlayedSuccessfully || isRetrying || fallbackShown) return;
+        
+        isRetrying = true;
+        clearAllTimeouts();
+        retryCount++;
+        
+        if (retryCount <= maxRetries) {
+            showReloadNotification('再生エラー発生... 再読み込み中 (' + retryCount + '/' + maxRetries + ')');
+            
+            errorTimeout = setTimeout(function() {
+                isRetrying = false;
+                
+                if (video) {
+                    destroyHlsInstance();
+                    
+                    if (m3u8Url && Hls.isSupported()) {
+                        initHls();
+                    } else {
+                        const sources = video.querySelectorAll('source');
+                        if (sources.length > 0) {
+                            video.load();
+                            video.play().catch(function() {});
+                        } else if (video.src) {
+                            const currentSrc = video.src;
+                            video.src = '';
+                            video.src = currentSrc;
+                            video.load();
+                            video.play().catch(function() {});
+                        }
+                    }
+                }
+            }, 2000);
+        } else {
+            isRetrying = false;
+            hideReloadNotification();
+            showFallbackOptions();
+        }
+    }
+
+    function showFallbackOptions() {
+        if (fallbackShown) return;
+        fallbackShown = true;
+        
+        let fallbackDiv = document.getElementById('fallback-options');
+        if (fallbackDiv) {
+            fallbackDiv.remove();
+        }
+        
+        fallbackDiv = document.createElement('div');
+        fallbackDiv.id = 'fallback-options';
+        fallbackDiv.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--bg-card, #1a1a2e); border: 1px solid var(--border-color, #2a2a4a); padding: 24px; border-radius: 12px; z-index: 9999; text-align: center; max-width: 400px;';
+        
+        const title = document.createElement('h3');
+        title.style.cssText = 'margin-bottom: 16px; color: var(--text-primary, #fff);';
+        title.textContent = '再生に失敗しました';
+        fallbackDiv.appendChild(title);
+        
+        const description = document.createElement('p');
+        description.style.cssText = 'margin-bottom: 20px; color: var(--text-secondary, #b8b8c8);';
+        description.textContent = '別のモードで再生をお試しください';
+        fallbackDiv.appendChild(description);
+        
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.cssText = 'display: flex; flex-direction: column; gap: 12px;';
+        
+        const buttonStyle = 'padding: 12px 24px; background: #8b4513; color: white; text-decoration: none; border-radius: 8px; display: block;';
+        
+        if (mode !== 'embed') {
+            const embedLink = document.createElement('a');
+            embedLink.href = '/ume?v=' + videoId;
+            embedLink.style.cssText = buttonStyle;
+            embedLink.textContent = '🔗 埋め込みモードで再生';
+            buttonContainer.appendChild(embedLink);
+        }
+        if (mode !== 'education') {
+            const eduLink = document.createElement('a');
+            eduLink.href = '/edu?v=' + videoId;
+            eduLink.style.cssText = buttonStyle;
+            eduLink.textContent = '🎓 Educationモードで再生';
+            buttonContainer.appendChild(eduLink);
+        }
+        if (mode !== 'stream') {
+            const streamLink = document.createElement('a');
+            streamLink.href = '/watch?v=' + videoId;
+            streamLink.style.cssText = buttonStyle;
+            streamLink.textContent = '🎬 ストリームモードで再生';
+            buttonContainer.appendChild(streamLink);
+        }
+        
+        const reloadBtn = document.createElement('button');
+        reloadBtn.style.cssText = 'padding: 12px 24px; background: var(--bg-secondary, #16213e); border: 1px solid var(--border-color, #2a2a4a); color: var(--text-primary, #fff); border-radius: 8px; cursor: pointer;';
+        reloadBtn.textContent = '🔄 ページを再読み込み';
+        reloadBtn.addEventListener('click', function() { location.reload(); });
+        buttonContainer.appendChild(reloadBtn);
+        
+        const closeBtn = document.createElement('button');
+        closeBtn.style.cssText = 'padding: 8px 16px; background: transparent; border: none; color: var(--text-secondary, #b8b8c8); cursor: pointer;';
+        closeBtn.textContent = '閉じる';
+        closeBtn.addEventListener('click', function() {
+            fallbackDiv.style.display = 'none';
+        });
+        buttonContainer.appendChild(closeBtn);
+        
+        fallbackDiv.appendChild(buttonContainer);
+        document.body.appendChild(fallbackDiv);
+    }
+
+    function initHls() {
+        if (!video || !m3u8Url) return;
+        
+        destroyHlsInstance();
+        
+        hlsInstance = new Hls({
+            maxBufferLength: 30,
+            maxMaxBufferLength: 60,
+            startLevel: -1
+        });
+        hlsInstance.loadSource(m3u8Url);
+        hlsInstance.attachMedia(video);
+        
+        hlsInstance.on(Hls.Events.ERROR, function(event, data) {
+            if (data.fatal) {
+                destroyHlsInstance();
+                handleVideoError();
+            }
+        });
+        
+        hlsInstance.on(Hls.Events.MANIFEST_PARSED, function() {
+            video.play().catch(function() {});
+        });
+    }
 
     if (video && m3u8Url && !video.querySelector('source')) {
         if (Hls.isSupported()) {
-            const hls = new Hls();
-            hls.loadSource(m3u8Url);
-            hls.attachMedia(video);
+            initHls();
         } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
             video.src = m3u8Url;
         }
+    }
+
+    if (video) {
+        video.addEventListener('error', function(e) {
+            console.log('Video error:', e);
+            handleVideoError();
+        });
+        
+        video.addEventListener('stalled', function() {
+            console.log('Video stalled');
+            if (!hasPlayedSuccessfully && !isRetrying && video.currentTime < 1) {
+                clearTimeout(stalledTimeout);
+                stalledTimeout = setTimeout(function() {
+                    if (!hasPlayedSuccessfully && !isRetrying && video.currentTime < 1 && video.readyState < 3) {
+                        handleVideoError();
+                    }
+                }, 8000);
+            }
+        });
+        
+        video.addEventListener('playing', function() {
+            hasPlayedSuccessfully = true;
+            resetRetryState();
+        });
+        
+        video.addEventListener('canplay', function() {
+            hideReloadNotification();
+            clearTimeout(stalledTimeout);
+            clearTimeout(initialLoadTimeout);
+        });
+        
+        initialLoadTimeout = setTimeout(function() {
+            if (video && !hasPlayedSuccessfully && !isRetrying && video.readyState < 2) {
+                handleVideoError();
+            }
+        }, 10000);
     }
 
     const descToggle = document.getElementById('desc-toggle');
