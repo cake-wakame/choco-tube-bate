@@ -553,6 +553,25 @@ def channel(channel_id):
                          vc=vc,
                          proxy=proxy)
 
+@app.route('/help')
+def help_page():
+    theme = request.cookies.get('theme', 'dark')
+    return render_template('help.html', theme=theme)
+
+@app.route('/blog')
+def blog_page():
+    theme = request.cookies.get('theme', 'dark')
+    posts = [
+        {
+            'date': '2024-01-15',
+            'category': 'お知らせ',
+            'title': 'チョコTubeへようこそ！',
+            'excerpt': 'チョコTubeは、快適に動画を視聴するためのプラットフォームです。',
+            'content': '<p>チョコTubeをご利用いただきありがとうございます。このサービスでは、広告なしで動画を楽しむことができます。</p><p>何かご不明な点がございましたら、ヘルプページをご確認ください。</p>'
+        }
+    ]
+    return render_template('blog.html', theme=theme, posts=posts)
+
 @app.route('/thumbnail')
 def thumbnail():
     video_id = request.args.get('v', '')
