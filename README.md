@@ -1,4 +1,4 @@
-# チョコTUBE - YouTube視聴サイト
+# チョコTUBE - YouTube視聴サイト (日本語版)
 
 ## プロジェクト概要
 
@@ -80,3 +80,138 @@
 - Invidious API: 複数インスタンスからフォールバック
 - 高画質ストリーム: webmコンテナ、1080p/720p優先
 - 音声ストリーム: m4a AUDIO_QUALITY_MEDIUM
+
+# チョコTube - YouTube Alternative Frontend
+
+## Overview
+
+チョコTube is a privacy-focused YouTube frontend application built with Flask. It provides an alternative interface for watching YouTube videos with multiple playback modes, search functionality, and channel browsing. The application features a modern dark/light theme UI with Japanese localization and emphasizes privacy by proxying requests through various services.
+
+## User Preferences
+
+Preferred communication style: Simple, everyday language.
+
+## System Architecture
+
+### Frontend Architecture
+
+**Technology Stack**: Vanilla JavaScript, HTML5, CSS3 with custom properties for theming
+
+**Design Pattern**: Server-side rendering with progressive enhancement
+- Templates use Jinja2 for server-side HTML generation
+- Client-side JavaScript handles theme toggling, search suggestions, and dynamic interactions
+- CSS custom properties enable seamless light/dark theme switching
+- Responsive design approach without framework dependencies
+
+**Rationale**: Server-side rendering provides faster initial page loads and better SEO while maintaining simplicity. The vanilla JS approach avoids framework overhead for this relatively simple UI.
+
+### Backend Architecture
+
+**Framework**: Flask (Python web microframework)
+
+**Request Handling Strategy**: Connection pooling with retry logic
+- Custom session with HTTPAdapter configured for connection reuse (20 connections)
+- Automatic retry on server errors (500-504 status codes)
+- Backoff strategy to handle temporary failures gracefully
+
+**Caching Strategy**: In-memory caching with timestamp-based invalidation
+- Educational video parameters cached to reduce API calls
+- Trending videos cached to minimize external requests
+- Thumbnail proxy cache to reduce bandwidth
+- LRU cache decorator used for frequently accessed data
+
+**Rationale**: In-memory caching is simple and effective for single-instance deployment. The retry strategy ensures resilience against temporary service disruptions.
+
+### Video Playback Modes
+
+**Multi-source fallback architecture**: Four distinct playback modes
+1. **Stream mode** (default): Direct streaming via proxy API
+2. **High quality mode**: WebM format for better quality
+3. **Embed mode**: YouTube nocookie embed iframe
+4. **Education mode**: Custom educational video API integration
+
+**Fallback chain**: Application attempts multiple sources in order until successful
+- Primary stream URL → M3U8 playlist → Embed fallback
+- HLS.js library handles adaptive streaming for M3U8 playlists
+
+**Rationale**: Multiple playback modes ensure video availability even when specific sources fail. The fallback mechanism maximizes reliability.
+
+### Data Sources & Integration
+
+**Primary APIs**:
+- **Invidious instances**: Privacy-respecting YouTube API alternatives (9 instances with rotation)
+- **Educational video API**: Custom backend for educational content
+- **Stream proxy APIs**: YTDL-based services for direct video streaming
+- **YouTube Data API**: Optional direct YouTube API integration
+
+**Instance rotation**: Random selection from multiple Invidious servers
+- Distributes load across instances
+- Provides redundancy if specific instances are down
+- User-Agent rotation to avoid rate limiting
+
+**Rationale**: Multiple Invidious instances provide redundancy and avoid single points of failure. Privacy is maintained by not directly contacting YouTube servers.
+
+### Routing Structure
+
+**Core routes**:
+- `/` - Home page with trending videos
+- `/search` - Search results with video/channel filtering
+- `/watch`, `/w`, `/ume`, `/edu` - Different video player modes
+- `/channel/<id>` - Channel information and videos
+- `/thumbnail` - Proxy endpoint for video thumbnails
+- `/api/*` - JSON endpoints for AJAX requests (suggestions, search)
+
+**Design pattern**: RESTful routing with mode-based player selection
+- Query parameter `vc` determines playback mode
+- Consistent URL structure across different modes
+
+## External Dependencies
+
+### Third-party Services
+
+1. **Invidious Network**
+   - Purpose: Privacy-respecting YouTube API proxy
+   - Instances: 9 public instances with automatic rotation
+   - Endpoints: Video metadata, search, trending, channel data
+   - Fallback: Multiple instances ensure high availability
+
+2. **YTDL Stream Service** (ytdl-0et1.onrender.com)
+   - Purpose: Direct video stream extraction
+   - Endpoints: `/stream/` for direct playback, `/m3u8/` for HLS playlists
+   - Format: Returns streamable URLs and M3U8 manifests
+
+3. **Educational Video API** (siawaseok.duckdns.org)
+   - Purpose: Custom educational content integration
+   - Configuration: External JSON config from GitHub repository
+   - Format: Custom video metadata and streaming URLs
+
+4. **YouTube Data API v3**
+   - Purpose: Optional direct API access (requires API key)
+   - Usage: Search and video metadata when enabled
+   - Environment variable: `YOUTUBE_API_KEY`
+
+### Frontend Libraries
+
+1. **HLS.js** (v1.4.12)
+   - Purpose: HTTP Live Streaming (HLS) support in browsers
+   - Usage: M3U8 playlist playback for adaptive streaming
+   - CDN delivery for reliability
+
+2. **Google Fonts**
+   - Font: Noto Sans JP (Japanese language support)
+   - Weights: 400, 500, 700
+   - Purpose: Consistent typography across platforms
+
+### Python Packages
+
+- **Flask** (>=2.0.0): Web framework
+- **requests** (>=2.28.0): HTTP client with retry support
+- **urllib3**: Low-level HTTP client (via requests)
+- **python-dotenv** (>=1.0.0): Environment variable management
+- **gunicorn** (>=21.0.0): Production WSGI server
+
+### Deployment Platform
+
+- **Replit**: Primary hosting platform
+- **Environment variables**: API keys and configuration
+- **Port**: 5000 (Flask development) / 8080 (production)
