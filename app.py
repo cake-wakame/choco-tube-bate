@@ -1,9 +1,14 @@
 import os
 import json
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import urllib.parse
 import datetime
 import random
+import time
+from functools import lru_cache
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, render_template, request, jsonify, Response
 
 app = Flask(__name__)
@@ -17,6 +22,14 @@ STREAM_API = "https://ytdl-0et1.onrender.com/stream/"
 M3U8_API = "https://ytdl-0et1.onrender.com/m3u8/"
 
 _edu_params_cache = {'params': None, 'timestamp': 0}
+_trending_cache = {'data': None, 'timestamp': 0}
+_thumbnail_cache = {}
+
+session = requests.Session()
+retry_strategy = Retry(total=2, backoff_factor=0.1, status_forcelist=[500, 502, 503, 504])
+adapter = HTTPAdapter(max_retries=retry_strategy, pool_connections=20, pool_maxsize=20)
+session.mount("http://", adapter)
+session.mount("https://", adapter)
 
 USER_AGENTS = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -42,7 +55,6 @@ def get_random_headers():
     }
 
 def get_edu_params():
-    import time
     cache_duration = 300
     current_time = time.time()
     
@@ -50,7 +62,7 @@ def get_edu_params():
         return _edu_params_cache['params']
     
     try:
-        res = requests.get(EDU_CONFIG_URL, headers=get_random_headers(), timeout=5)
+        res = session.get(EDU_CONFIG_URL, headers=get_random_headers(), timeout=3)
         res.raise_for_status()
         data = res.json()
         params = data.get('params', '')
@@ -64,19 +76,20 @@ def get_edu_params():
         print(f"Failed to fetch edu params: {e}")
         return "autoplay=1&rel=0&modestbranding=1"
 
-def safe_request(url, timeout=(3, 8)):
+def safe_request(url, timeout=(2, 5)):
     try:
-        res = requests.get(url, headers=get_random_headers(), timeout=timeout)
+        res = session.get(url, headers=get_random_headers(), timeout=timeout)
         res.raise_for_status()
         return res.json()
     except:
         return None
 
-def request_invidious_api(path, timeout=(3, 8)):
-    for instance in INVIDIOUS_INSTANCES:
+def request_invidious_api(path, timeout=(2, 5)):
+    random_instances = random.sample(INVIDIOUS_INSTANCES, min(3, len(INVIDIOUS_INSTANCES)))
+    for instance in random_instances:
         try:
             url = instance + 'api/v1' + path
-            res = requests.get(url, headers=get_random_headers(), timeout=timeout)
+            res = session.get(url, headers=get_random_headers(), timeout=timeout)
             if res.status_code == 200:
                 return res.json()
         except:
@@ -87,7 +100,7 @@ def get_youtube_search(query, max_results=20):
     if YOUTUBE_API_KEY:
         url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q={urllib.parse.quote(query)}&maxResults={max_results}&key={YOUTUBE_API_KEY}"
         try:
-            res = requests.get(url, timeout=10)
+            res = session.get(url, timeout=5)
             res.raise_for_status()
             data = res.json()
             results = []
@@ -164,7 +177,7 @@ def get_video_info(video_id):
 
     if not data:
         try:
-            res = requests.get(f"{EDU_VIDEO_API}{video_id}", headers=get_random_headers(), timeout=(3, 10))
+            res = session.get(f"{EDU_VIDEO_API}{video_id}", headers=get_random_headers(), timeout=(2, 6))
             res.raise_for_status()
             edu_data = res.json()
 
@@ -308,7 +321,7 @@ def get_stream_url(video_id):
     }
 
     try:
-        res = requests.get(f"{STREAM_API}{video_id}", headers=get_random_headers(), timeout=(5, 10))
+        res = session.get(f"{STREAM_API}{video_id}", headers=get_random_headers(), timeout=(3, 6))
         if res.status_code == 200:
             data = res.json()
             formats = data.get('formats', [])
@@ -327,7 +340,7 @@ def get_stream_url(video_id):
         pass
 
     try:
-        res = requests.get(f"{M3U8_API}{video_id}", headers=get_random_headers(), timeout=(5, 10))
+        res = session.get(f"{M3U8_API}{video_id}", headers=get_random_headers(), timeout=(3, 6))
         if res.status_code == 200:
             data = res.json()
             m3u8_formats = data.get('m3u8_formats', [])
@@ -362,8 +375,14 @@ def get_comments(video_id):
     return comments
 
 def get_trending():
+    cache_duration = 300
+    current_time = time.time()
+    
+    if _trending_cache['data'] and (current_time - _trending_cache['timestamp']) < cache_duration:
+        return _trending_cache['data']
+    
     path = "/popular"
-    data = request_invidious_api(path, timeout=(2, 5))
+    data = request_invidious_api(path, timeout=(2, 4))
 
     if data:
         results = []
@@ -379,6 +398,8 @@ def get_trending():
                     'views': item.get('viewCountText', '')
                 })
         if results:
+            _trending_cache['data'] = results
+            _trending_cache['timestamp'] = current_time
             return results
 
     default_videos = [
@@ -396,7 +417,7 @@ def get_trending():
 def get_suggestions(keyword):
     try:
         url = f"https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&q={urllib.parse.quote(keyword)}"
-        res = requests.get(url, headers=get_random_headers(), timeout=3)
+        res = session.get(url, headers=get_random_headers(), timeout=2)
         if res.status_code == 200:
             data = res.json()
             return data[1] if len(data) > 1 else []
@@ -538,10 +559,25 @@ def thumbnail():
     if not video_id:
         return '', 404
 
+    current_time = time.time()
+    cache_key = video_id
+    if cache_key in _thumbnail_cache:
+        cached_data, cached_time = _thumbnail_cache[cache_key]
+        if current_time - cached_time < 3600:
+            response = Response(cached_data, mimetype='image/jpeg')
+            response.headers['Cache-Control'] = 'public, max-age=3600'
+            return response
+
     try:
         url = f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
-        res = requests.get(url, headers=get_random_headers(), timeout=5)
-        return Response(res.content, mimetype='image/jpeg')
+        res = session.get(url, headers=get_random_headers(), timeout=3)
+        if len(_thumbnail_cache) > 500:
+            oldest_key = min(_thumbnail_cache.keys(), key=lambda k: _thumbnail_cache[k][1])
+            del _thumbnail_cache[oldest_key]
+        _thumbnail_cache[cache_key] = (res.content, current_time)
+        response = Response(res.content, mimetype='image/jpeg')
+        response.headers['Cache-Control'] = 'public, max-age=3600'
+        return response
     except:
         return '', 404
 
