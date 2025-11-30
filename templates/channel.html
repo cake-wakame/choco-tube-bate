@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ channel.channelName if channel else 'チャンネル' }} - チョコTUBE{% endblock %}
+{% block title %}{{ channel.channelName if channel else 'チャンネル' }} - チョコTube{% endblock %}
 
 {% block content %}
 <div class="channel-container">
@@ -41,7 +41,7 @@
             {% for video in videos %}
             <a href="{{ '/watch' if vc == '1' else ('/w' if vc == '2' else ('/ume' if vc == '3' else '/edu')) }}?v={{ video.id }}" class="video-card">
                 <div class="thumbnail-container">
-                    <img src="{% if proxy == 'True' %}/thumbnail?v={{ video.id }}{% else %}https://i.ytimg.com/vi/{{ video.id }}/hqdefault.jpg{% endif %}" alt="{{ video.title }}" class="thumbnail" loading="lazy">
+                    <img src="/thumbnail?v={{ video.id }}" alt="{{ video.title }}" class="thumbnail" loading="lazy">
                     {% if video.length %}
                     <span class="video-duration">{{ video.length }}</span>
                     {% endif %}
