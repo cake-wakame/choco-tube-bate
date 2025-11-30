@@ -12,8 +12,11 @@ app.config['JSON_AS_ASCII'] = False
 YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY', '')
 
 EDU_VIDEO_API = "https://siawaseok.duckdns.org/api/video2/"
+EDU_CONFIG_URL = "https://raw.githubusercontent.com/siawaseok3/wakame/master/video_config.json"
 STREAM_API = "https://ytdl-0et1.onrender.com/stream/"
 M3U8_API = "https://ytdl-0et1.onrender.com/m3u8/"
+
+_edu_params_cache = {'params': None, 'timestamp': 0}
 
 USER_AGENTS = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -37,6 +40,29 @@ def get_random_headers():
     return {
         'User-Agent': random.choice(USER_AGENTS)
     }
+
+def get_edu_params():
+    import time
+    cache_duration = 300
+    current_time = time.time()
+    
+    if _edu_params_cache['params'] and (current_time - _edu_params_cache['timestamp']) < cache_duration:
+        return _edu_params_cache['params']
+    
+    try:
+        res = requests.get(EDU_CONFIG_URL, headers=get_random_headers(), timeout=5)
+        res.raise_for_status()
+        data = res.json()
+        params = data.get('params', '')
+        if params.startswith('?'):
+            params = params[1:]
+        params = params.replace('&amp;', '&')
+        _edu_params_cache['params'] = params
+        _edu_params_cache['timestamp'] = current_time
+        return params
+    except Exception as e:
+        print(f"Failed to fetch edu params: {e}")
+        return "autoplay=1&rel=0&modestbranding=1"
 
 def safe_request(url, timeout=(3, 8)):
     try:
@@ -82,20 +108,20 @@ def get_youtube_search(query, max_results=20):
             return results
         except Exception as e:
             print(f"YouTube API error: {e}")
-    
+
     return invidious_search(query)
 
 def invidious_search(query, page=1):
     path = f"/search?q={urllib.parse.quote(query)}&page={page}&hl=jp"
     data = request_invidious_api(path)
-    
+
     if not data:
         return []
-    
+
     results = []
     for item in data:
         item_type = item.get('type', '')
-        
+
         if item_type == 'video':
             length_seconds = item.get('lengthSeconds', 0)
             results.append({
@@ -129,19 +155,19 @@ def invidious_search(query, page=1):
                 'thumbnail': item.get('playlistThumbnail', ''),
                 'count': item.get('videoCount', 0)
             })
-    
+
     return results
 
 def get_video_info(video_id):
     path = f"/videos/{urllib.parse.quote(video_id)}"
     data = request_invidious_api(path, timeout=(5, 15))
-    
+
     if not data:
         try:
             res = requests.get(f"{EDU_VIDEO_API}{video_id}", headers=get_random_headers(), timeout=(3, 10))
             res.raise_for_status()
             edu_data = res.json()
-            
+
             related_videos = []
             for item in edu_data.get('related', [])[:20]:
                 related_videos.append({
@@ -153,7 +179,7 @@ def get_video_info(video_id):
                     'thumbnail': f"https://i.ytimg.com/vi/{item.get('videoId', '')}/mqdefault.jpg",
                     'length': ''
                 })
-            
+
             return {
                 'title': edu_data.get('title', ''),
                 'description': edu_data.get('description', {}).get('formatted', ''),
@@ -172,7 +198,7 @@ def get_video_info(video_id):
         except Exception as e:
             print(f"EDU Video API error: {e}")
             return None
-    
+
     recommended = data.get('recommendedVideos', data.get('recommendedvideo', []))
     related_videos = []
     for item in recommended[:20]:
@@ -186,12 +212,12 @@ def get_video_info(video_id):
             'thumbnail': f"https://i.ytimg.com/vi/{item.get('videoId', '')}/mqdefault.jpg",
             'length': str(datetime.timedelta(seconds=length_seconds)) if length_seconds else ''
         })
-    
+
     adaptive_formats = data.get('adaptiveFormats', [])
     stream_urls = []
     highstream_url = None
     audio_url = None
-    
+
     for stream in adaptive_formats:
         if stream.get('container') == 'webm' and stream.get('resolution'):
             stream_urls.append({
@@ -202,18 +228,18 @@ def get_video_info(video_id):
                 highstream_url = stream.get('url')
             elif stream.get('resolution') == '720p' and not highstream_url:
                 highstream_url = stream.get('url')
-    
+
     for stream in adaptive_formats:
         if stream.get('container') == 'm4a' and stream.get('audioQuality') == 'AUDIO_QUALITY_MEDIUM':
             audio_url = stream.get('url')
             break
-    
+
     format_streams = data.get('formatStreams', [])
     video_urls = [stream.get('url', '') for stream in reversed(format_streams)][:2]
-    
+
     author_thumbnails = data.get('authorThumbnails', [])
     author_thumbnail = author_thumbnails[-1].get('url', '') if author_thumbnails else ''
-    
+
     return {
         'title': data.get('title', ''),
         'description': data.get('descriptionHtml', '').replace('\n', '<br>'),
@@ -235,10 +261,10 @@ def get_video_info(video_id):
 def get_channel_info(channel_id):
     path = f"/channels/{urllib.parse.quote(channel_id)}"
     data = request_invidious_api(path, timeout=(5, 15))
-    
+
     if not data:
         return None
-    
+
     latest_videos = data.get('latestVideos', data.get('latestvideo', []))
     videos = []
     for item in latest_videos:
@@ -253,14 +279,14 @@ def get_channel_info(channel_id):
             'views': item.get('viewCountText', ''),
             'length': str(datetime.timedelta(seconds=length_seconds)) if length_seconds else ''
         })
-    
+
     author_thumbnails = data.get('authorThumbnails', [])
     author_thumbnail = author_thumbnails[-1].get('url', '') if author_thumbnails else ''
-    
+
     author_banners = data.get('authorBanners', [])
     author_banner = urllib.parse.quote(author_banners[0].get('url', ''), safe='-_.~/:'
     ) if author_banners else ''
-    
+
     return {
         'videos': videos,
         'channelName': data.get('author', ''),
@@ -272,25 +298,26 @@ def get_channel_info(channel_id):
     }
 
 def get_stream_url(video_id):
+    edu_params = get_edu_params()
     urls = {
         'primary': None,
         'fallback': None,
         'm3u8': None,
         'embed': f"https://www.youtube-nocookie.com/embed/{video_id}?autoplay=1",
-        'education': f"https://www.youtubeeducation.com/embed/{video_id}?autoplay=1"
+        'education': f"https://www.youtubeeducation.com/embed/{video_id}?{edu_params}"
     }
-    
+
     try:
         res = requests.get(f"{STREAM_API}{video_id}", headers=get_random_headers(), timeout=(5, 10))
         if res.status_code == 200:
             data = res.json()
             formats = data.get('formats', [])
-            
+
             for fmt in formats:
                 if fmt.get('itag') == '18':
                     urls['primary'] = fmt.get('url')
                     break
-            
+
             if not urls['primary']:
                 for fmt in formats:
                     if fmt.get('url') and fmt.get('vcodec') != 'none':
@@ -298,7 +325,7 @@ def get_stream_url(video_id):
                         break
     except:
         pass
-    
+
     try:
         res = requests.get(f"{M3U8_API}{video_id}", headers=get_random_headers(), timeout=(5, 10))
         if res.status_code == 200:
@@ -309,16 +336,16 @@ def get_stream_url(video_id):
                 urls['m3u8'] = best.get('url')
     except:
         pass
-    
+
     return urls
 
 def get_comments(video_id):
     path = f"/comments/{urllib.parse.quote(video_id)}?hl=jp"
     data = request_invidious_api(path)
-    
+
     if not data:
         return []
-    
+
     comments = []
     for item in data.get('comments', []):
         thumbnails = item.get('authorThumbnails', [])
@@ -331,13 +358,13 @@ def get_comments(video_id):
             'likes': item.get('likeCount', 0),
             'published': item.get('publishedText', '')
         })
-    
+
     return comments
 
 def get_trending():
     path = "/popular"
     data = request_invidious_api(path, timeout=(2, 5))
-    
+
     if data:
         results = []
         for item in data[:24]:
@@ -353,7 +380,7 @@ def get_trending():
                 })
         if results:
             return results
-    
+
     default_videos = [
         {'type': 'video', 'id': 'dQw4w9WgXcQ', 'title': 'Rick Astley - Never Gonna Give You Up', 'author': 'Rick Astley', 'thumbnail': 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg', 'published': '', 'views': '17億 回視聴'},
         {'type': 'video', 'id': 'kJQP7kiw5Fk', 'title': 'Luis Fonsi - Despacito ft. Daddy Yankee', 'author': 'Luis Fonsi', 'thumbnail': 'https://i.ytimg.com/vi/kJQP7kiw5Fk/hqdefault.jpg', 'published': '', 'views': '80億 回視聴'},
@@ -390,13 +417,13 @@ def search():
     vc = request.cookies.get('vc', '1')
     proxy = request.cookies.get('proxy', 'False')
     theme = request.cookies.get('theme', 'dark')
-    
+
     if not query:
         return render_template('search.html', results=[], query='', vc=vc, proxy=proxy, theme=theme, next='')
-    
+
     results = get_youtube_search(query) if page == '1' else invidious_search(query, int(page))
     next_page = f"/search?q={urllib.parse.quote(query)}&page={int(page) + 1}"
-    
+
     return render_template('search.html', results=results, query=query, vc=vc, proxy=proxy, theme=theme, next=next_page)
 
 @app.route('/watch')
@@ -404,14 +431,14 @@ def watch():
     video_id = request.args.get('v', '')
     theme = request.cookies.get('theme', 'dark')
     proxy = request.cookies.get('proxy', 'False')
-    
+
     if not video_id:
         return render_template('index.html', videos=get_trending(), theme=theme)
-    
+
     video_info = get_video_info(video_id)
     stream_urls = get_stream_url(video_id)
     comments = get_comments(video_id)
-    
+
     return render_template('watch.html',
                          video_id=video_id,
                          video=video_info,
@@ -426,14 +453,14 @@ def watch_high_quality():
     video_id = request.args.get('v', '')
     theme = request.cookies.get('theme', 'dark')
     proxy = request.cookies.get('proxy', 'False')
-    
+
     if not video_id:
         return render_template('index.html', videos=get_trending(), theme=theme)
-    
+
     video_info = get_video_info(video_id)
     stream_urls = get_stream_url(video_id)
     comments = get_comments(video_id)
-    
+
     return render_template('watch.html',
                          video_id=video_id,
                          video=video_info,
@@ -448,14 +475,14 @@ def watch_embed():
     video_id = request.args.get('v', '')
     theme = request.cookies.get('theme', 'dark')
     proxy = request.cookies.get('proxy', 'False')
-    
+
     if not video_id:
         return render_template('index.html', videos=get_trending(), theme=theme)
-    
+
     video_info = get_video_info(video_id)
     stream_urls = get_stream_url(video_id)
     comments = get_comments(video_id)
-    
+
     return render_template('watch.html',
                          video_id=video_id,
                          video=video_info,
@@ -470,14 +497,14 @@ def watch_education():
     video_id = request.args.get('v', '')
     theme = request.cookies.get('theme', 'dark')
     proxy = request.cookies.get('proxy', 'False')
-    
+
     if not video_id:
         return render_template('index.html', videos=get_trending(), theme=theme)
-    
+
     video_info = get_video_info(video_id)
     stream_urls = get_stream_url(video_id)
     comments = get_comments(video_id)
-    
+
     return render_template('watch.html',
                          video_id=video_id,
                          video=video_info,
@@ -492,12 +519,12 @@ def channel(channel_id):
     theme = request.cookies.get('theme', 'dark')
     vc = request.cookies.get('vc', '1')
     proxy = request.cookies.get('proxy', 'False')
-    
+
     channel_info = get_channel_info(channel_id)
-    
+
     if not channel_info:
         return render_template('channel.html', channel=None, videos=[], theme=theme, vc=vc, proxy=proxy)
-    
+
     return render_template('channel.html',
                          channel=channel_info,
                          videos=channel_info.get('videos', []),
@@ -510,7 +537,7 @@ def thumbnail():
     video_id = request.args.get('v', '')
     if not video_id:
         return '', 404
-    
+
     try:
         url = f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
         res = requests.get(url, headers=get_random_headers(), timeout=5)
@@ -528,7 +555,7 @@ def suggest():
 def comments_api():
     video_id = request.args.get('v', '')
     comments = get_comments(video_id)
-    
+
     html = ''
     for comment in comments:
         html += f'''
@@ -544,7 +571,7 @@ def comments_api():
             </div>
         </div>
         '''
-    
+
     return html if html else '<p class="no-comments">コメントはありません</p>'
 
 @app.route('/api/search')
@@ -552,7 +579,7 @@ def api_search():
     query = request.args.get('q', '')
     if not query:
         return jsonify({'error': 'Query required'}), 400
-    
+
     results = get_youtube_search(query)
     return jsonify(results)
 
