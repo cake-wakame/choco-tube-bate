@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ query }} - チョコTUBE検索{% endblock %}
+{% block title %}{{ query }} - チョコTube検索{% endblock %}
 
 {% block content %}
 <div class="search-container">
@@ -18,12 +18,6 @@
                 <option value="0" {% if vc == '0' %}selected{% endif %}>Education</option>
             </select>
         </div>
-        <div class="settings-item">
-            <label for="proxyToggle">
-                <input type="checkbox" id="proxyToggle" {% if proxy == 'True' %}checked{% endif %}>
-                プロキシサムネイル
-            </label>
-        </div>
     </div>
 
     <div class="search-results">
@@ -31,7 +25,7 @@
             {% if result.type == 'video' %}
             <a href="{{ '/watch' if vc == '1' else ('/w' if vc == '2' else ('/ume' if vc == '3' else '/edu')) }}?v={{ result.id }}" class="search-result-card dynamic-link" data-video-id="{{ result.id }}">
                 <div class="result-thumbnail-container">
-                    <img src="{% if proxy == 'True' %}/thumbnail?v={{ result.id }}{% else %}{{ result.thumbnail }}{% endif %}" alt="{{ result.title }}" class="result-thumbnail" loading="lazy">
+                    <img src="/thumbnail?v={{ result.id }}" alt="{{ result.title }}" class="result-thumbnail" loading="lazy">
                     {% if result.length %}
                     <span class="video-duration">{{ result.length }}</span>
                     {% endif %}
@@ -94,19 +88,18 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const vcSelect = document.getElementById('vcSelect');
-    const proxyToggle = document.getElementById('proxyToggle');
-    
+
     function getCookie(name) {
         const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
         return v ? decodeURIComponent(v.pop()) : null;
     }
-    
+
     function setCookie(name, value, days) {
         const d = new Date();
         d.setTime(d.getTime() + (days || 30) * 24 * 60 * 60 * 1000);
         document.cookie = name + '=' + encodeURIComponent(value) + ';expires=' + d.toUTCString() + ';path=/';
     }
-    
+
     function vcToPath(vc) {
         switch(vc) {
             case '1': return '/watch';
@@ -115,7 +108,7 @@ document.addEventListener('DOMContentLoaded', function() {
             default: return '/edu';
         }
     }
-    
+
     function updateLinks(vc) {
         const links = document.querySelectorAll('a.dynamic-link');
         links.forEach(function(a) {
@@ -125,24 +118,17 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-    
+
     if (vcSelect) {
         const savedVc = getCookie('vc');
         if (savedVc) {
             vcSelect.value = savedVc;
             updateLinks(savedVc);
         }
-        
+
         vcSelect.addEventListener('change', function() {
             setCookie('vc', this.value, 30);
             updateLinks(this.value);
-        });
-    }
-    
-    if (proxyToggle) {
-        proxyToggle.addEventListener('change', function() {
-            setCookie('proxy', this.checked ? 'True' : 'False', 30);
-            location.reload();
         });
     }
 });
