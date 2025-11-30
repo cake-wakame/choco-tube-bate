@@ -567,7 +567,8 @@ def blog_page():
             'category': 'お知らせ',
             'title': 'チョコTubeへようこそ！',
             'excerpt': 'youtubeサイトを作ってみたよ～',
-            'content': '<p>読み込みが遅いだって？しゃーない。これから改善させるよ</p><p>あとはbbs(チャット)とかゲームとか追加したいなぁ</p>'
+            'content': '<p>読み込みが遅いだって？しゃーない。これから改善させるよ</p><p>あとはbbs(チャット)とかゲームとか追加したいなぁ</p>
+            <p>ちなみに何か意見とか聞きたいこととかあったら<a href="https://scratch.mit.edu/projects/1249572814/">ここでコメント</a>してね。</p>'
         }
     ]
     return render_template('blog.html', theme=theme, posts=posts)
